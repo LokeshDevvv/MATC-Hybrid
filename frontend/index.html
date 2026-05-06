@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Text Analyzer</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg:        #FAF8F4;
+  --card:      #FFFFFF;
+  --text:      #1A1A1A;
+  --text-soft: #555555;
+  --text-dim:  #8A8A8A;
+  --line:      #E8E4DA;
+  --line-soft: #F0EDE5;
+  --accent:    #1E3A66;
+
+  /* sentiment — three clearly distinct hues */
+  --pos:       #059669;   /* emerald */
+  --pos-bg:    #D1FAE5;
+  --pos-line:  #10B981;
+
+  --neg:       #DC2626;   /* crimson */
+  --neg-bg:    #FEE2E2;
+  --neg-line:  #EF4444;
+
+  --neu:       #475569;   /* cool slate, not earth-brown */
+  --neu-bg:    #F1F5F9;
+  --neu-line:  #94A3B8;
+
+  /* warn / sarcasm — mustard yellow, far from any red */
+  --warn:      #B45309;
+  --warn-bg:   #FEF3C7;
+  --warn-line: #EAB308;
+
+  /* entity hues — each in its own hue family, none overlap with sentiment */
+  --ent-per:    #1D4ED8;  --ent-per-bg:    #DBEAFE;  /* royal blue */
+  --ent-org:    #BE185D;  --ent-org-bg:    #FCE7F3;  /* magenta */
+  --ent-loc:    #0E7490;  --ent-loc-bg:    #CFFAFE;  /* cyan */
+  --ent-date:   #7C3AED;  --ent-date-bg:   #EDE9FE;  /* violet */
+  --ent-money:  #15803D;  --ent-money-bg:  #DCFCE7;  /* dark green */
+  --ent-percent:#A16207;  --ent-percent-bg:#FEF3C7;  /* amber */
+  --ent-num:    #4338CA;  --ent-num-bg:    #E0E7FF;  /* indigo */
+  --ent-time:   #6D28D9;  --ent-time-bg:   #F3E8FF;  /* purple */
+  --ent-prod:   #C2410C;  --ent-prod-bg:   #FFEDD5;  /* orange */
+  --ent-misc:   #475569;  --ent-misc-bg:   #F1F5F9;  /* slate */
+
+  --sans:  'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+  --serif: 'Newsreader', Georgia, serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); }
+
+body {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.shell {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 56px 28px 80px;
+}
+
+/* ─── Header ─── */
+header { margin-bottom: 36px; }
+
+h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--text-soft);
+  line-height: 1.45;
+  font-variation-settings: "opsz" 18;
+  max-width: 600px;
+}
+
+/* ─── Mode toggle ─── */
+.mode-toggle {
+  display: inline-flex;
+  background: var(--line-soft);
+  border-radius: 6px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+
+.mode-toggle button {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-soft);
+  transition: all 150ms ease;
+}
+
+.mode-toggle button.active {
+  background: white;
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* ─── Input ─── */
+textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.55;
+  font-variation-settings: "opsz" 20;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px 18px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+textarea::placeholder { color: var(--text-dim); font-style: italic; }
+textarea:focus { border-color: var(--accent); }
+
+.action-row {
+  display: flex;
+  align-items: center;
+  margin-top: 14px;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Auto toggle (custom checkbox / pill) */
+.auto-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.auto-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auto-toggle .auto-knob {
+  width: 30px;
+  height: 18px;
+  background: var(--line);
+  border-radius: 999px;
+  position: relative;
+  transition: background 200ms ease;
+  flex-shrink: 0;
+}
+
+.auto-toggle .auto-knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 200ms ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.auto-toggle input[type="checkbox"]:checked + .auto-knob {
+  background: var(--accent);
+}
+
+.auto-toggle input[type="checkbox"]:checked + .auto-knob::after {
+  transform: translateX(12px);
+}
+
+.auto-toggle:hover .auto-knob {
+  filter: brightness(0.95);
+}
+
+.auto-label {
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.auto-toggle input[type="checkbox"]:checked ~ .auto-label {
+  color: var(--accent);
+}
+
+button.primary {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 22px;
+  cursor: pointer;
+  transition: background 150ms ease, transform 100ms ease;
+}
+
+button.primary:hover { background: #15294a; }
+button.primary:active { transform: translateY(1px); }
+button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.samples {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.samples span.lbl {
+  font-size: 13px;
+  color: var(--text-dim);
+  align-self: center;
+  padding-right: 4px;
+}
+
+.samples button {
+  font-family: var(--sans);
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.samples button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── 8-lens indicator ─── */
+.lens-strip {
+  margin: 18px 0 12px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.lens {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.lens .lens-bar {
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.lens .lens-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  width: 0;
+  transition: width 400ms ease;
+}
+
+.lens.done .lens-bar::after  { width: 100%; background: var(--pos); }
+.lens.active .lens-bar::after {
+  width: 100%;
+  animation: lensWave 1.2s ease-in-out infinite;
+}
+
+@keyframes lensWave {
+  0%, 100% { transform: translateX(-100%); }
+  50%      { transform: translateX(100%); }
+}
+
+.lens .lens-name {
+  text-align: center;
+  font-size: 9px;
+}
+
+.lens.active .lens-name, .lens.done .lens-name { color: var(--text); }
+
+/* ─── Error ─── */
+.error {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: var(--neg-bg);
+  border-left: 3px solid var(--neg);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--neg);
+}
+
+/* ─── Section title ─── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin: 32px 0 12px;
+}
+
+/* ─── Highlighted text card (the headline view) ─── */
+.highlight-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px 26px;
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.85;
+  font-variation-settings: "opsz" 24;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+
+.highlight-card .ht-sentence {
+  display: inline;
+  padding: 1px 0 2px;
+  border-radius: 2px;
+  cursor: default;
+  transition: background 150ms ease;
+}
+
+.highlight-card .ht-sentence.pos {
+  background: var(--pos-bg);
+  box-shadow: inset 0 -3px 0 var(--pos-line);
+  padding: 2px 3px 4px;
+}
+
+.highlight-card .ht-sentence.neg {
+  background: var(--neg-bg);
+  box-shadow: inset 0 -3px 0 var(--neg-line);
+  padding: 2px 3px 4px;
+}
+
+.highlight-card .ht-sentence.neu {
+  background: var(--neu-bg);
+  box-shadow: inset 0 -2px 0 var(--neu-line);
+  padding: 2px 3px 4px;
+}
+
+.highlight-card .ht-sentence.sarcasm {
+  background: var(--warn-bg);
+  box-shadow: inset 0 -3px 0 var(--warn-line);
+  padding: 2px 3px 4px;
+  text-decoration: underline wavy var(--warn);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 4px;
+}
+
+.highlight-card .ht-sentence.toxic {
+  background: var(--neg);
+  color: white;
+  box-shadow: inset 0 -3px 0 #7F1D1D;
+  padding: 2px 4px 4px;
+}
+
+.highlight-card .ht-sentence:hover { filter: brightness(0.96); }
+
+.highlight-card mark {
+  display: inline;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 500;
+  border-bottom-width: 0;
+  font-style: normal;
+  position: relative;
+}
+
+.highlight-card mark.PER     { background: var(--ent-per-bg);     color: var(--ent-per); }
+.highlight-card mark.ORG     { background: var(--ent-org-bg);     color: var(--ent-org); }
+.highlight-card mark.LOC     { background: var(--ent-loc-bg);     color: var(--ent-loc); }
+.highlight-card mark.DATE    { background: var(--ent-date-bg);    color: var(--ent-date); }
+.highlight-card mark.TIME    { background: var(--ent-time-bg);    color: var(--ent-time); }
+.highlight-card mark.MONEY   { background: var(--ent-money-bg);   color: var(--ent-money); }
+.highlight-card mark.PERCENT { background: var(--ent-percent-bg); color: var(--ent-percent); }
+.highlight-card mark.NUM     { background: var(--ent-num-bg);     color: var(--ent-num); }
+.highlight-card mark.QTY     { background: var(--ent-num-bg);     color: var(--ent-num); }
+.highlight-card mark.ORDINAL { background: var(--ent-num-bg);     color: var(--ent-num); }
+.highlight-card mark.PROD    { background: var(--ent-prod-bg);    color: var(--ent-prod); }
+.highlight-card mark.WORK    { background: var(--ent-prod-bg);    color: var(--ent-prod); }
+.highlight-card mark.EVENT   { background: var(--ent-prod-bg);    color: var(--ent-prod); }
+.highlight-card mark.GROUP   { background: var(--ent-org-bg);     color: var(--ent-org); }
+.highlight-card mark.LANG    { background: var(--ent-misc-bg);    color: var(--ent-misc); }
+.highlight-card mark.LAW     { background: var(--ent-misc-bg);    color: var(--ent-misc); }
+.highlight-card mark.MISC    { background: var(--ent-misc-bg);    color: var(--ent-misc); }
+
+/* legend */
+.legend {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.legend-swatch.pos  { background: var(--pos-line); }
+.legend-swatch.neg  { background: var(--neg-line); }
+.legend-swatch.neu  { background: var(--neu-line); }
+.legend-swatch.sarc { background: var(--warn-line); }
+.legend-swatch.PER     { background: var(--ent-per); }
+.legend-swatch.ORG     { background: var(--ent-org); }
+.legend-swatch.LOC     { background: var(--ent-loc); }
+.legend-swatch.DATE    { background: var(--ent-date); }
+.legend-swatch.MONEY   { background: var(--ent-money); }
+.legend-swatch.PERCENT { background: var(--ent-percent); }
+.legend-swatch.NUM     { background: var(--ent-num); }
+.legend-swatch.MISC    { background: var(--ent-misc); }
+
+/* ─── Summary ─── */
+.summary {
+  margin-top: 14px;
+  padding: 18px 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px 24px;
+}
+
+.summary-item .label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.summary-item .value {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.summary-item .value.pos  { color: var(--pos); }
+.summary-item .value.neg  { color: var(--neg); }
+.summary-item .value.neu  { color: var(--neu); }
+.summary-item .value.warn { color: var(--warn); }
+
+.summary-item .value.mono { font-family: var(--mono); font-size: 14px; font-weight: 400; }
+
+/* ─── Sentence cards ─── */
+.results { display: flex; flex-direction: column; gap: 12px; }
+
+.sentence-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--neu-line);
+  border-radius: 6px;
+  padding: 14px 18px;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: fadeIn 350ms ease forwards;
+}
+
+.sentence-card.pos { border-left-color: var(--pos-line); }
+.sentence-card.neg { border-left-color: var(--neg-line); }
+.sentence-card.warn { border-left-color: var(--warn-line); }
+
+.results > .sentence-card:nth-child(1) { animation-delay: 0ms; }
+.results > .sentence-card:nth-child(2) { animation-delay: 50ms; }
+.results > .sentence-card:nth-child(3) { animation-delay: 100ms; }
+.results > .sentence-card:nth-child(4) { animation-delay: 150ms; }
+.results > .sentence-card:nth-child(5) { animation-delay: 200ms; }
+.results > .sentence-card:nth-child(6) { animation-delay: 250ms; }
+.results > .sentence-card:nth-child(7) { animation-delay: 300ms; }
+.results > .sentence-card:nth-child(8) { animation-delay: 350ms; }
+
+@keyframes fadeIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sentence-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sent-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.sent-text {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  font-variation-settings: "opsz" 20;
+  color: var(--text-soft);
+  font-style: italic;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--sans);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text-soft);
+}
+
+.tag .key {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.tag .val { color: var(--text); font-weight: 500; }
+
+.tag.pos    { border-color: rgba(31, 107, 61, 0.25); background: var(--pos-bg); }
+.tag.pos .val { color: var(--pos); }
+.tag.neg    { border-color: rgba(178, 58, 58, 0.25); background: var(--neg-bg); }
+.tag.neg .val { color: var(--neg); }
+.tag.warn   { border-color: rgba(178, 94, 26, 0.25); background: var(--warn-bg); }
+.tag.warn .val { color: var(--warn); }
+
+.tag .pct { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+
+/* ─── Footer ─── */
+footer {
+  margin-top: 64px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* spinner */
+.spinner {
+  display: inline-block;
+  width: 11px; height: 11px;
+  border: 1.5px solid white;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* responsive */
+@media (max-width: 600px) {
+  .shell { padding: 36px 18px 60px; }
+  h1 { font-size: 22px; }
+  textarea { font-size: 16px; }
+  .lens-strip { grid-template-columns: repeat(4, 1fr); }
+  .highlight-card { font-size: 17px; padding: 18px 20px; }
+}
+
+</style>
+</head>
+<body>
+<main class="shell">
+
+  <header>
+    <h1>Text Analyzer</h1>
+    <p class="subtitle">A paragraph often mixes tones — a complaint here, a question there, a positive line in between. This breaks any text into its sentences and reads each one separately.</p>
+  </header>
+
+  <section>
+    <div class="mode-toggle">
+      <button class="active" data-mode="paragraph">Per sentence</button>
+      <button data-mode="single">Whole text</button>
+    </div>
+
+    <textarea id="input" rows="4" placeholder="Paste a paragraph. Each sentence is read separately and shown with its own colour and tags."></textarea>
+
+    <div class="action-row">
+      <button class="primary" id="run-btn">Analyze</button>
+      <label class="auto-toggle" title="Automatically analyze when you stop typing">
+        <input type="checkbox" id="auto-toggle" />
+        <span class="auto-knob"></span>
+        <span class="auto-label">Auto</span>
+      </label>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-left:auto;" id="status">Ready · ⌘+Enter</span>
+    </div>
+
+    <div class="samples">
+      <span class="lbl">Try:</span>
+      <button data-sample="I waited 45 minutes for my food. The waiter was rude. But honestly, the dessert at the end was incredible.">Restaurant</button>
+      <button data-sample="Apple announced a new iPhone today. The new chip is 40% faster. I'm so excited to upgrade!">Tech news</button>
+      <button data-sample="Hi team. Production server is down. Customers are calling. Please drop everything and look at this now.">Team alert</button>
+      <button data-sample="Oh great, another Monday. Just what I needed. I love sitting in traffic for two hours.">Sarcastic</button>
+    </div>
+
+    <!-- 8-lens activity strip -->
+    <div class="lens-strip" id="lens-strip">
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">tone</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">feel</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">topic</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">intent</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">urgency</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">irony</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">harm</span></div>
+      <div class="lens"><div class="lens-bar"></div><span class="lens-name">names</span></div>
+    </div>
+  </section>
+
+  <div id="error" class="error" style="display:none"></div>
+
+  <div id="output"></div>
+
+  <footer>
+    Built for educational use.
+  </footer>
+
+</main>
+
+<script>
+const API_BASE = location.origin.replace(/\/$/, "");
+const $ = (id) => document.getElementById(id);
+let mode = "paragraph";
+
+document.querySelectorAll(".mode-toggle button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".mode-toggle button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    mode = b.dataset.mode;
+  });
+});
+
+document.querySelectorAll(".samples button").forEach(b => {
+  b.addEventListener("click", () => {
+    $("input").value = b.dataset.sample;
+    $("input").focus();
+  });
+});
+
+$("run-btn").addEventListener("click", () => run());
+$("input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
+});
+
+// ─── Auto / live mode ────────────────────────────────────────────────
+const DEBOUNCE_MS = 1200;       // how long after last keystroke before firing
+let autoMode = false;
+let debounceTimer = null;
+let inflight = null;            // AbortController for in-flight request
+let lastAnalysed = "";
+
+$("auto-toggle").addEventListener("change", (e) => {
+  autoMode = e.target.checked;
+  if (autoMode) {
+    $("status").textContent = "Auto on — pause typing to analyze";
+    // immediately analyze if there's already text
+    const t = $("input").value.trim();
+    if (t && t !== lastAnalysed) scheduleAuto();
+  } else {
+    cancelAuto();
+    $("status").textContent = "Ready · ⌘+Enter";
+  }
+});
+
+$("input").addEventListener("input", () => {
+  if (!autoMode) return;
+  scheduleAuto();
+});
+
+function scheduleAuto() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  // cancel an in-flight request — its result will be stale
+  if (inflight) { inflight.abort(); inflight = null; }
+  $("status").textContent = "Waiting for pause…";
+  debounceTimer = setTimeout(() => {
+    const t = $("input").value.trim();
+    if (!t || t === lastAnalysed) {
+      $("status").textContent = "Idle";
+      return;
+    }
+    run({ silent: true });
+  }, DEBOUNCE_MS);
+}
+
+function cancelAuto() {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+  if (inflight) { inflight.abort(); inflight = null; }
+}
+
+function setLensState(state) {
+  // state: "idle" | "active" | "done"
+  document.querySelectorAll(".lens").forEach((el, i) => {
+    el.classList.remove("active", "done");
+    if (state === "active") el.classList.add("active");
+    if (state === "done") el.classList.add("done");
+  });
+}
+
+async function run({ silent = false } = {}) {
+  const text = $("input").value.trim();
+  if (!text) {
+    if (!silent) $("input").focus();
+    return;
+  }
+
+  // Cancel any prior in-flight request (auto mode reuse)
+  if (inflight) { inflight.abort(); inflight = null; }
+
+  const btn = $("run-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Reading';
+  $("status").textContent = "8 lenses engaged";
+  $("error").style.display = "none";
+  if (!silent) $("output").innerHTML = "";
+  setLensState("active");
+
+  const url = mode === "paragraph"
+    ? `${API_BASE}/analyze_paragraph`
+    : `${API_BASE}/analyze`;
+
+  inflight = new AbortController();
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: inflight.signal,
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    if (mode === "paragraph") renderParagraph(text, data);
+    else renderSingle(text, data);
+
+    setLensState("done");
+    $("status").textContent =
+      (autoMode ? "Live · " : "Done · ") +
+      ((data.elapsed_ms || 0) / 1000).toFixed(1) + "s";
+    lastAnalysed = text;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      // user typed again before we finished — silently drop
+      return;
+    }
+    $("error").textContent = "Error: " + (err.message || err) + " — make sure the analyzer service is running.";
+    $("error").style.display = "block";
+    setLensState("idle");
+    $("status").textContent = "Failed";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Analyze";
+    inflight = null;
+  }
+}
+
+// ─── Paragraph mode ───
+function renderParagraph(text, d) {
+  const out = $("output");
+  out.innerHTML = "";
+
+  // 1. Highlighted text view (full paragraph with sentence + entity highlights)
+  out.appendChild(headingEl("Reading"));
+  out.appendChild(buildHighlightCard(text, d.sentences || []));
+  out.appendChild(buildLegend());
+
+  // 2. Summary
+  out.appendChild(headingEl("Overall"));
+  out.appendChild(buildSummaryParagraph(d));
+
+  // 3. Per-sentence cards
+  out.appendChild(headingEl("Sentence breakdown"));
+  const list = document.createElement("div");
+  list.className = "results";
+  (d.sentences || []).forEach((s, i) => list.appendChild(buildSentenceCard(s, i + 1)));
+  out.appendChild(list);
+}
+
+function renderSingle(text, d) {
+  const out = $("output");
+  out.innerHTML = "";
+
+  // Treat the whole text as one "sentence" for the highlighted view
+  const fakeSentenceObj = { ...d, text };
+  out.appendChild(headingEl("Reading"));
+  out.appendChild(buildHighlightCard(text, [fakeSentenceObj]));
+  out.appendChild(buildLegend());
+
+  out.appendChild(headingEl("Result"));
+  out.appendChild(buildSummarySingle(d));
+
+  out.appendChild(headingEl("Detail"));
+  const list = document.createElement("div");
+  list.className = "results";
+  list.appendChild(buildSentenceCard(fakeSentenceObj, 1));
+  out.appendChild(list);
+}
+
+// ─── Highlight card (Grammarly-style) ───
+function buildHighlightCard(text, sentences) {
+  const card = document.createElement("div");
+  card.className = "highlight-card";
+
+  // We need to colour each sentence within the original text and inject entity marks per-sentence.
+  // Find each sentence's offset in the source text by simple substring search.
+  let parts = [];
+  let cursor = 0;
+
+  sentences.forEach((s, idx) => {
+    if (!s.text) return;
+    const at = text.indexOf(s.text, cursor);
+    if (at === -1) return;
+
+    if (at > cursor) parts.push({ kind: "raw", text: text.slice(cursor, at) });
+
+    // Sentence span with sentiment / sarcasm / toxic colouring
+    const sentLabel = (s.sentiment || {}).label || "neutral";
+    const isSarcastic = (s.sarcasm || {}).is_sarcastic;
+    const isToxic = (s.toxicity || {}).is_toxic;
+
+    let cls = sentClass(sentLabel);
+    if (isToxic) cls = "toxic";
+    if (isSarcastic) cls = "sarcasm";
+
+    parts.push({
+      kind: "sentence",
+      cls,
+      tip: buildTooltip(s),
+      content: applyEntities(s.text, s.entities || []),
+    });
+
+    cursor = at + s.text.length;
+  });
+
+  if (cursor < text.length) parts.push({ kind: "raw", text: text.slice(cursor) });
+
+  card.innerHTML = parts.map(p => {
+    if (p.kind === "raw") return escapeHTML(p.text);
+    return `<span class="ht-sentence ${p.cls}" title="${escapeHTML(p.tip)}">${p.content}</span>`;
+  }).join("");
+
+  return card;
+}
+
+function buildTooltip(s) {
+  const sent = (s.sentiment || {}).label || "—";
+  const emo  = ((s.emotions || [])[0] || {}).label || "—";
+  const top  = (s.topic || {}).label || "—";
+  const intent = (s.intent || {}).label || "—";
+  return `${sent.toUpperCase()} · feels ${emo} · ${top} · ${intent}`;
+}
+
+function applyEntities(text, entities) {
+  if (!entities || entities.length === 0) return escapeHTML(text);
+  // Entities have offsets relative to the original full text, but we now have
+  // sentence-only text. The offsets in the per-sentence response are relative
+  // to the sentence (since each sentence was passed individually to NER).
+  const sorted = [...entities].sort((a, b) => a.start - b.start);
+  let html = "", cursor = 0;
+  sorted.forEach(e => {
+    if (e.start < cursor) return;  // overlap, skip
+    if (e.start > text.length) return;
+    if (cursor < e.start) html += escapeHTML(text.slice(cursor, e.start));
+    const slice = text.slice(e.start, e.end);
+    const safeType = (e.type || "MISC").replace(/[^A-Z]/g, "");
+    html += `<mark class="${safeType}" title="${safeType}">${escapeHTML(slice)}</mark>`;
+    cursor = e.end;
+  });
+  if (cursor < text.length) html += escapeHTML(text.slice(cursor));
+  return html;
+}
+
+// ─── Legend ───
+function buildLegend() {
+  const el = document.createElement("div");
+  el.className = "legend";
+  el.innerHTML = `
+    <span class="legend-item"><span class="legend-swatch pos"></span>positive</span>
+    <span class="legend-item"><span class="legend-swatch neg"></span>negative</span>
+    <span class="legend-item"><span class="legend-swatch neu"></span>neutral</span>
+    <span class="legend-item"><span class="legend-swatch sarc"></span>sarcastic</span>
+    <span class="legend-item"><span class="legend-swatch PER"></span>person</span>
+    <span class="legend-item"><span class="legend-swatch ORG"></span>organisation</span>
+    <span class="legend-item"><span class="legend-swatch LOC"></span>location</span>
+    <span class="legend-item"><span class="legend-swatch DATE"></span>date</span>
+    <span class="legend-item"><span class="legend-swatch MONEY"></span>money</span>
+    <span class="legend-item"><span class="legend-swatch PERCENT"></span>percent</span>
+    <span class="legend-item"><span class="legend-swatch NUM"></span>number</span>
+    <span class="legend-item"><span class="legend-swatch MISC"></span>other</span>
+  `;
+  return el;
+}
+
+// ─── Summaries ───
+function buildSummaryParagraph(d) {
+  const sm = d.summary || {};
+  const lang = (d.language || {}).language || "—";
+  const elapsed = ((d.elapsed_ms || 0) / 1000).toFixed(1);
+  const el = document.createElement("div");
+  el.className = "summary";
+  el.innerHTML = `
+    <div class="summary-grid">
+      ${sumItem("Sentences", sm.sentence_count)}
+      ${sumItem("Overall tone", sm.dominant_sentiment, sentClass(sm.dominant_sentiment))}
+      ${sumItem("Top feeling", sm.dominant_emotion)}
+      ${sumItem("Language", lang.toUpperCase())}
+      ${sm.any_toxic ? sumItem("Harm", "flagged", "warn") : ""}
+      ${sm.any_sarcastic ? sumItem("Irony", "detected", "warn") : ""}
+      ${sumItem("Time", elapsed + "s", "mono")}
+    </div>
+  `;
+  return el;
+}
+
+function buildSummarySingle(d) {
+  const lang = (d.language || {}).language || "—";
+  const elapsed = ((d.elapsed_ms || 0) / 1000).toFixed(1);
+  const el = document.createElement("div");
+  el.className = "summary";
+  el.innerHTML = `
+    <div class="summary-grid">
+      ${sumItem("Tone", (d.sentiment || {}).label, sentClass((d.sentiment || {}).label))}
+      ${sumItem("Feeling", ((d.emotions || [])[0] || {}).label)}
+      ${sumItem("Topic", (d.topic || {}).label)}
+      ${sumItem("Intent", (d.intent || {}).label)}
+      ${sumItem("Urgency", (d.urgency || {}).label, (d.urgency || {}).label === "urgent" ? "warn" : "")}
+      ${sumItem("Language", lang.toUpperCase())}
+      ${sumItem("Time", elapsed + "s", "mono")}
+    </div>
+  `;
+  return el;
+}
+
+function sumItem(label, value, cls = "") {
+  return `<div class="summary-item">
+    <div class="label">${label}</div>
+    <div class="value ${cls}">${value || "—"}</div>
+  </div>`;
+}
+
+// ─── Sentence cards (the smaller view) ───
+function buildSentenceCard(s, num) {
+  const card = document.createElement("div");
+  const sentLabel = (s.sentiment || {}).label || "neutral";
+  const isToxic = (s.toxicity || {}).is_toxic;
+  const isSarcastic = (s.sarcasm || {}).is_sarcastic;
+
+  let borderCls = sentClass(sentLabel);
+  if (isToxic) borderCls = "neg";
+  if (isSarcastic) borderCls = "warn";
+  card.className = "sentence-card " + borderCls;
+
+  const topEmotion = (s.emotions || [])[0];
+  const topic = s.topic || {};
+  const intent = s.intent || {};
+  const urgency = s.urgency || {};
+  const entities = s.entities || [];
+
+  const tags = [];
+  tags.push(tagHtml("tone", sentLabel, (s.sentiment || {}).score, sentClass(sentLabel)));
+  if (topEmotion) tags.push(tagHtml("feel", topEmotion.label, topEmotion.score, ""));
+  if (topic.label) tags.push(tagHtml("topic", topic.label, topic.score, ""));
+  if (intent.label) tags.push(tagHtml("intent", intent.label, intent.score, ""));
+  if ((urgency.label || "") === "urgent") tags.push(tagHtml("urgent", "yes", urgency.score, "warn"));
+  if (isSarcastic) tags.push(tagHtml("irony", "detected", (s.sarcasm || {}).score, "warn"));
+  if (isToxic) tags.push(tagHtml("harm", "flagged", (s.toxicity || {}).toxic, "neg"));
+  if (entities.length > 0) tags.push(tagHtml("names", entities.length, null, ""));
+
+  card.innerHTML = `
+    <div class="sentence-head">
+      <span class="sent-num">${String(num).padStart(2, "0")}</span>
+      <span class="sent-text">${escapeHTML(s.text || "")}</span>
+    </div>
+    <div class="tag-row">${tags.join("")}</div>
+  `;
+  return card;
+}
+
+function tagHtml(key, val, score, klass) {
+  const pct = score != null ? ` <span class="pct">${Math.round(score * 100)}%</span>` : "";
+  return `<span class="tag ${klass}"><span class="key">${key}</span><span class="val">${val}</span>${pct}</span>`;
+}
+
+function headingEl(text) {
+  const h = document.createElement("div");
+  h.className = "section-title";
+  h.textContent = text;
+  return h;
+}
+
+function sentClass(label) {
+  if (label === "positive") return "pos";
+  if (label === "negative") return "neg";
+  if (label === "neutral") return "neu";
+  return "";
+}
+
+function escapeHTML(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+</script>
+</body>
+</html>

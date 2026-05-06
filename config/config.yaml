@@ -1,0 +1,51 @@
+model:
+  embedding_dim: 768
+  max_seq_length: 512
+  vocab_size: 50265
+  dropout: 0.1
+
+mamba:
+  num_layers: 4
+  d_model: 768
+  d_state: 16
+  d_conv: 4
+  expand_factor: 2
+
+transformer:
+  num_layers: 4
+  num_heads: 12
+  d_model: 768
+  d_ff: 3072
+  dropout: 0.1
+
+fusion:
+  method: "gated"
+  d_model: 768
+
+contrastive:
+  projection_dim: 256
+  temperature: 0.07
+  loss_weight: 0.4
+
+label_graph:
+  gat_hidden: 128
+  gat_heads: 4
+  gat_layers: 2
+  label_embed_dim: 256
+
+training:
+  batch_size: 32
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  max_epochs: 30
+  warmup_steps: 500
+  scheduler: "cosine"
+  optimizer: "adamw"
+  alpha: 0.6
+  gradient_clip: 1.0
+  early_stopping_patience: 5
+
+data:
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15

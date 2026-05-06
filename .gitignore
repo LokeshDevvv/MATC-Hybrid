@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+env/
+
+# Local Claude / IDE state
+.claude/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+serve8000.log
+serve8001.log
+
+# 33 MB cached features — regenerate with extract_features_v2.py
+cache/
+
+# 373 MB broken legacy MATC-Net checkpoint (NaN weights)
+results/best_model_ag_news.pt
+*.pt.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artefacts
+tests/edge_case_results.json
